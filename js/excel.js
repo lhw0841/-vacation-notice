@@ -1,0 +1,136 @@
+// ExcelJS로 부서별 통보서 워크북을 생성한다 (python 버전의 build_workbook과 1:1 대응)
+// ExcelJS는 vendor/exceljs.min.js가 만든 전역(window.ExcelJS)을 사용한다.
+
+import { periodStr, usagePeriodMonths, safeSheetName } from "./domain.js";
+
+var FONT_NAME = "맑은 고딕";
+var THIN = { style: "thin" };
+var BOX = { top: THIN, bottom: THIN, left: THIN, right: THIN };
+var FILL_HILITE = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF6DFC8" } };
+
+function styleCell(cell, opts) {
+  opts = opts || {};
+  cell.font = opts.font || { name: FONT_NAME, size: 11 };
+  cell.alignment = opts.align || { horizontal: "center", vertical: "middle" };
+  cell.border = opts.border !== undefined ? opts.border : BOX;
+  if (opts.fill) cell.fill = opts.fill;
+}
+
+function styleMergedRange(ws, r1, c1, r2, c2, opts) {
+  for (var r = r1; r <= r2; r++) {
+    for (var c = c1; c <= c2; c++) {
+      styleCell(ws.getRow(r).getCell(c), opts);
+    }
+  }
+}
+
+export async function buildWorkbook(dept, members, noticeDate) {
+  var wb = new ExcelJS.Workbook();
+  var ws = wb.addWorksheet(safeSheetName(dept));
+
+  ws.getColumn(1).width = 17;
+  ws.getColumn(2).width = 14.44;
+  for (var c = 3; c <= 8; c++) ws.getColumn(c).width = 15.78;
+
+  // 회사통보일
+  ws.mergeCells(1, 1, 1, 2);
+  ws.getCell(1, 1).value = "회사통보일 : " + noticeDate.getFullYear() + "년  " +
+    String(noticeDate.getMonth() + 1).padStart(2, "0") + "월   " +
+    String(noticeDate.getDate()).padStart(2, "0") + "일";
+  styleMergedRange(ws, 1, 1, 1, 2, { font: { name: FONT_NAME, size: 12, bold: true }, border: {} });
+  ws.getRow(1).height = 20;
+
+  // 제목
+  ws.mergeCells(3, 1, 5, 8);
+  ws.getCell(3, 1).value = "미사용 연차유급휴가 사용시기 지정통보서";
+  styleMergedRange(ws, 3, 1, 5, 8, { font: { name: FONT_NAME, size: 28 }, border: {} });
+
+  // 안내문
+  ws.mergeCells(7, 1, 8, 8);
+  ws.getCell(7, 1).value = "사용시기 지정통보서를 통해 아래와 같이\n본인의 미사용 연차유급휴가 사용시기를 지정하여 알려 주시길 바랍니다.";
+  styleMergedRange(ws, 7, 1, 8, 8, {
+    font: { name: FONT_NAME, size: 16, bold: true },
+    align: { horizontal: "center", vertical: "middle", wrapText: true },
+    border: {},
+  });
+  ws.getRow(8).height = 31.5;
+
+  // 1. 통지받은 내역
+  ws.getCell(14, 1).value = "1. 통지받은 내역";
+  styleCell(ws.getCell(14, 1), { font: { name: FONT_NAME, size: 14, bold: true }, align: { vertical: "middle" }, border: {} });
+
+  var headerRow = 16;
+  ws.mergeCells(headerRow, 3, headerRow, 4);
+  styleMergedRange(ws, headerRow, 3, headerRow, 4, { font: { name: FONT_NAME, size: 11, bold: true } });
+  var headers = ["부서", "성명", "연차휴가 발생(사용) 대상 기간", null, "발생 연차(A)", "사용연차(B)", "미사용 연차(A-B)", "확인(사인)"];
+  headers.forEach(function (text, idx) {
+    if (text === null) return;
+    var col = idx + 1;
+    var cell = ws.getCell(headerRow, col);
+    cell.value = text;
+    var fill = (col === 5 || col === 7) ? FILL_HILITE : undefined;
+    styleCell(cell, { font: { name: FONT_NAME, size: 11, bold: true }, fill: fill });
+  });
+  ws.getRow(headerRow).height = 35;
+
+  var dataStart = headerRow + 1;
+  members.forEach(function (emp, i) {
+    var r = dataStart + i;
+    ws.mergeCells(r, 3, r, 4);
+    styleMergedRange(ws, r, 3, r, 4, { font: { name: FONT_NAME, size: 11, bold: false } });
+
+    styleCell(ws.getCell(r, 1), { font: { name: FONT_NAME, size: 11, bold: true } });
+    ws.getCell(r, 1).value = dept;
+
+    styleCell(ws.getCell(r, 2), { font: { name: FONT_NAME, size: 11, bold: false } });
+    ws.getCell(r, 2).value = emp.name;
+
+    ws.getCell(r, 3).value = periodStr(emp.hire, noticeDate);
+
+    styleCell(ws.getCell(r, 5), { font: { name: FONT_NAME, size: 11, bold: true }, fill: FILL_HILITE });
+    ws.getCell(r, 5).value = emp.granted;
+
+    styleCell(ws.getCell(r, 6), { font: { name: FONT_NAME, size: 11, bold: true } });
+    ws.getCell(r, 6).value = emp.used;
+
+    styleCell(ws.getCell(r, 7), { font: { name: FONT_NAME, size: 11, bold: true }, fill: FILL_HILITE });
+    ws.getCell(r, 7).value = { formula: "E" + r + "-F" + r };
+
+    styleCell(ws.getCell(r, 8), { font: { name: FONT_NAME, size: 11, bold: true } });
+
+    ws.getRow(r).height = 35;
+  });
+
+  // 2. 개인별 사용시기 통보
+  var section2Row = dataStart + members.length + 3;
+  ws.getCell(section2Row, 1).value = "2. 미사용 연차유급휴가 개인별 사용시기 통보(월별/날짜 기재)";
+  styleCell(ws.getCell(section2Row, 1), { font: { name: FONT_NAME, size: 14, bold: true }, align: { vertical: "middle" }, border: {} });
+
+  var table2Header = section2Row + 2;
+  ws.mergeCells(table2Header, 2, table2Header, 8);
+  ws.getCell(table2Header, 1).value = "구분";
+  styleCell(ws.getCell(table2Header, 1), { font: { name: FONT_NAME, size: 11 } });
+  ws.getCell(table2Header, 2).value = "사용시기 지정일";
+  styleMergedRange(ws, table2Header, 2, table2Header, 8, { font: { name: FONT_NAME, size: 11 } });
+  ws.getRow(table2Header).height = 25;
+
+  var months = usagePeriodMonths(noticeDate);
+  var row = table2Header + 1;
+  months.forEach(function (ym) {
+    var blockStart = row;
+    members.forEach(function (emp) {
+      ws.mergeCells(row, 3, row, 8);
+      styleCell(ws.getCell(row, 2), { font: { name: FONT_NAME, size: 11 } });
+      ws.getCell(row, 2).value = emp.name;
+      styleMergedRange(ws, row, 3, row, 8, { font: { name: FONT_NAME, size: 11 } });
+      ws.getRow(row).height = 25;
+      row++;
+    });
+    var blockEnd = row - 1;
+    ws.mergeCells(blockStart, 1, blockEnd, 1);
+    styleMergedRange(ws, blockStart, 1, blockEnd, 1, { font: { name: FONT_NAME, size: 11 } });
+    ws.getCell(blockStart, 1).value = ym.year + "년 " + ym.month + "월";
+  });
+
+  return wb;
+}
