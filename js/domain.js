@@ -108,10 +108,20 @@ function pickRandomBusinessDates(noticeDate, count) {
   return picked;
 }
 
-// "10월 28일 / 10월 29일 / ..." 형식으로 잔여연차 개수만큼 지정일 목록 문자열 생성
+// "10월 28일 / 10월 29일 / 2026년 1월 5일 / ..." 형식으로 잔여연차 개수만큼 지정일 목록 문자열 생성.
+// 연도가 바뀌는 지점에서만 "YYYY년"을 붙여 표시한다(대상기간이 해를 넘길 수 있어 혼동 방지).
 function usageDateListStr(noticeDate, remainCount) {
+  var lastYear = null;
   return pickRandomBusinessDates(noticeDate, remainCount)
-    .map(function (d) { return (d.getMonth() + 1) + "월 " + d.getDate() + "일"; })
+    .map(function (d) {
+      var y = d.getFullYear();
+      var label = (d.getMonth() + 1) + "월 " + d.getDate() + "일";
+      if (y !== lastYear) {
+        label = y + "년 " + label;
+        lastYear = y;
+      }
+      return label;
+    })
     .join(" / ");
 }
 
