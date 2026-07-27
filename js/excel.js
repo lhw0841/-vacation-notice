@@ -23,6 +23,8 @@ function styleMergedRange(ws, r1, c1, r2, c2, opts) {
   }
 }
 
+var BOX_DOUBLE = { top: { style: "double" }, bottom: { style: "double" }, left: { style: "double" }, right: { style: "double" } };
+
 async function buildWorkbook(dept, members, noticeDate) {
   var wb = new ExcelJS.Workbook();
   var ws = wb.addWorksheet(safeSheetName(dept));
@@ -54,7 +56,7 @@ async function buildWorkbook(dept, members, noticeDate) {
   styleMergedRange(ws, 8, 1, 14, 8, {
     font: { name: FONT_NAME, size: 16, bold: true },
     align: { horizontal: "center", vertical: "middle", wrapText: true },
-    border: {},
+    border: BOX_DOUBLE,
     fill: FILL_GREEN,
   });
   ws.getRow(8).height = 18.95;
@@ -147,14 +149,8 @@ async function buildWorkbookV1(dept, members, noticeDate) {
   var wb = new ExcelJS.Workbook();
   var ws = wb.addWorksheet(safeSheetName(dept));
 
-  ws.getColumn(2).width = 17;
-  ws.getColumn(3).width = 14.44;
-  ws.getColumn(4).width = 15.78;
-  ws.getColumn(5).width = 18.22;
-  ws.getColumn(6).width = 15.78;
-  ws.getColumn(7).width = 13;
-  ws.getColumn(8).width = 13;
-  ws.getColumn(9).width = 13;
+  ws.getColumn(2).width = 18;
+  for (var c = 3; c <= 9; c++) ws.getColumn(c).width = 20;
 
   // 회사통보일
   ws.mergeCells(1, 2, 1, 3);
@@ -178,7 +174,7 @@ async function buildWorkbookV1(dept, members, noticeDate) {
   styleMergedRange(ws, 8, 2, 14, 9, {
     font: { name: FONT_NAME, size: 16, bold: true },
     align: { horizontal: "center", vertical: "middle", wrapText: true },
-    border: {},
+    border: BOX_DOUBLE,
     fill: FILL_GREEN,
   });
   ws.getRow(8).height = 18.95;
