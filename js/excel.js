@@ -41,24 +41,29 @@ async function buildWorkbook(dept, members, noticeDate) {
 
   // 제목
   ws.mergeCells(3, 1, 5, 8);
-  ws.getCell(3, 1).value = "미사용 연차유급휴가 사용시기 지정통보서";
+  ws.getCell(3, 1).value = "<미사용 연차유급휴가 사용 시기 통보>";
   styleMergedRange(ws, 3, 1, 5, 8, { font: { name: FONT_NAME, size: 28 }, border: {} });
+  ws.getRow(3).height = 17.25;
 
   // 안내문
-  ws.mergeCells(7, 1, 8, 8);
-  ws.getCell(7, 1).value = "사용시기 지정통보서를 통해 아래와 같이\n본인의 미사용 연차유급휴가 사용시기를 지정하여 알려 주시길 바랍니다.";
-  styleMergedRange(ws, 7, 1, 8, 8, {
+  ws.mergeCells(8, 1, 14, 8);
+  ws.getCell(8, 1).value =
+    "기 통보받은 사용시기 지정통보서 내용을 바탕으로 연차유급휴가 사용 독려를 위한 통보서 이오니 꼭 회신 바랍니다.\n\n" +
+    " 기 통보한 연차유급휴가 사용시기에 대한 수정이 필요한 경우 필히 서면 조치가 필요한 사항이오니 연락 후 조치 하시길 바랍니다.\n" +
+    "  - 해당 절차는 근로기준법 제 61조 연차 유급휴가의 사용촉진 규정에 의거 통보되는 사항입니다.";
+  styleMergedRange(ws, 8, 1, 14, 8, {
     font: { name: FONT_NAME, size: 16, bold: true },
     align: { horizontal: "center", vertical: "middle", wrapText: true },
     border: {},
+    fill: FILL_GREEN,
   });
-  ws.getRow(8).height = 31.5;
+  ws.getRow(8).height = 18.95;
 
   // 1. 통지받은 내역
-  ws.getCell(14, 1).value = "1. 통지받은 내역";
-  styleCell(ws.getCell(14, 1), { font: { name: FONT_NAME, size: 14, bold: true }, align: { vertical: "middle" }, border: {} });
+  ws.getCell(18, 1).value = "1. 통지받은 내역";
+  styleCell(ws.getCell(18, 1), { font: { name: FONT_NAME, size: 14, bold: true }, align: { vertical: "middle" }, border: {} });
 
-  var headerRow = 16;
+  var headerRow = 20;
   ws.mergeCells(headerRow, 3, headerRow, 4);
   styleMergedRange(ws, headerRow, 3, headerRow, 4, { font: { name: FONT_NAME, size: 11, bold: true } });
   var headers = ["부서", "성명", "연차휴가 발생(사용) 대상 기간", null, "발생 연차(A)", "사용연차(B)", "미사용 연차(A-B)", "확인(사인)"];
