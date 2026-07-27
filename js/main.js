@@ -1,10 +1,6 @@
 // 화면(UI) 연결부: 파일 선택 상태 관리, 버튼 클릭 처리, 결과 렌더링.
 // JSZip은 vendor/jszip.min.js가 만든 전역(window.JSZip)을 사용한다.
 
-import { parseCsv, readFileAsText } from "./csv.js";
-import { loadEmployees, groupByDept, safeFileName } from "./domain.js";
-import { buildWorkbook } from "./excel.js";
-
 var fileState = {
   less1granted: null,
   less1used: null,
@@ -36,6 +32,21 @@ Object.keys(fileInputMap).forEach(function (key) {
       nameEl.classList.add("empty");
       box.classList.remove("has-file");
     }
+  });
+});
+
+var selectedVersion = "v2";
+var versionToggle = document.getElementById("version-toggle");
+var versionHint = document.getElementById("version-hint");
+var versionHints = {
+  v2: "2차 통보: 미사용(잔여) 연차 개수만큼 통보일 다음날부터 1년 내 주말을 제외한 평일을 무작위로 지정해 나열합니다.",
+  v1: "1차 통보: 사용시기 지정일 칸을 빈칸으로 두어 직접 작성할 수 있는 서식을 생성합니다.",
+};
+versionToggle.querySelectorAll(".toggle-btn").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    selectedVersion = btn.dataset.version;
+    versionToggle.querySelectorAll(".toggle-btn").forEach(function (b) { b.classList.toggle("active", b === btn); });
+    versionHint.textContent = versionHints[selectedVersion];
   });
 });
 
@@ -79,7 +90,7 @@ function triggerDownload(blob, filename) {
 runBtn.addEventListener("click", async function () {
   var missing = Object.keys(fileState).filter(function (k) { return !fileState[k]; });
   if (missing.length) {
-    setStatus("CSV 파일 4개를 모두 선택해 주세요.", true, false);
+    setStatus("파일 4개를 모두 선택해 주세요.", true, false);
     return;
   }
   var noticeDateVal = noticeDateInput.value;
@@ -93,17 +104,17 @@ runBtn.addEventListener("click", async function () {
   generatedFiles = [];
 
   try {
-    setStatus("CSV 파일을 읽는 중...", false, true);
-    var texts = await Promise.all([
-      readFileAsText(fileState.less1granted),
-      readFileAsText(fileState.less1used),
-      readFileAsText(fileState.tenuredgranted),
-      readFileAsText(fileState.tenuredused),
+    setStatus("파일을 읽는 중...", false, true);
+    var parsed = await Promise.all([
+      parseSpreadsheetFile(fileState.less1granted),
+      parseSpreadsheetFile(fileState.less1used),
+      parseSpreadsheetFile(fileState.tenuredgranted),
+      parseSpreadsheetFile(fileState.tenuredused),
     ]);
-    var less1Granted = parseCsv(texts[0]);
-    var less1Used = parseCsv(texts[1]);
-    var tenuredGranted = parseCsv(texts[2]);
-    var tenuredUsed = parseCsv(texts[3]);
+    var less1Granted = parsed[0];
+    var less1Used = parsed[1];
+    var tenuredGranted = parsed[2];
+    var tenuredUsed = parsed[3];
 
     var employees = loadEmployees(less1Granted, less1Used, tenuredGranted, tenuredUsed);
     if (!employees.length) throw new Error("CSV에서 직원 데이터를 찾지 못했습니다. 파일 형식을 확인해 주세요.");
@@ -116,10 +127,14 @@ runBtn.addEventListener("click", async function () {
     for (var i = 0; i < groups.length; i++) {
       var g = groups[i];
       setStatus("생성 중... (" + (i + 1) + "/" + groups.length + ") " + g.dept, false, true);
-      var wb = await buildWorkbook(g.dept, g.members, noticeDate);
+      var wb = selectedVersion === "v1"
+        ? await buildWorkbookV1(g.dept, g.members, noticeDate)
+        : await buildWorkbook(g.dept, g.members, noticeDate);
       var buf = await wb.xlsx.writeBuffer();
       var blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-      var filename = "미사용 연차유급휴가 사용시기 지정통보서_" + safeFileName(g.dept) + ".xlsx";
+      var filename = selectedVersion === "v1"
+        ? "1차_미사용 연차유급휴가 사용 시기 통보_" + safeFileName(g.dept) + ".xlsx"
+        : "2차_미사용 연차유급휴가 사용시기 지정통보서_" + safeFileName(g.dept) + ".xlsx";
       generatedFiles.push({ dept: g.dept, count: g.members.length, filename: filename, blob: blob });
 
       var tr = document.createElement("tr");

@@ -1,6 +1,6 @@
 // CSV 파일을 읽고 파싱하는 유틸리티
 
-export function parseCsv(text) {
+function parseCsv(text) {
   if (text.charCodeAt(0) === 0xfeff) text = text.slice(1); // BOM 제거
   var rows = [];
   var row = [];
@@ -32,7 +32,7 @@ export function parseCsv(text) {
   });
 }
 
-export function readFileAsText(file) {
+function readFileAsText(file) {
   return new Promise(function (resolve, reject) {
     var reader = new FileReader();
     reader.onload = function () { resolve(reader.result); };
@@ -41,7 +41,52 @@ export function readFileAsText(file) {
   });
 }
 
-export function toFloat(v) {
+function readFileAsArrayBuffer(file) {
+  return new Promise(function (resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function () { resolve(reader.result); };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// 엑셀(.xlsx) 파일의 첫 시트를 CSV 파싱 결과와 동일한 형태(헤더 기반 객체 배열)로 변환한다.
+async function parseXlsx(file) {
+  var buf = await readFileAsArrayBuffer(file);
+  var wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buf);
+  var ws = wb.worksheets[0];
+  var rows = [];
+  ws.eachRow(function (row) {
+    var values = row.values.slice(1); // ExcelJS row.values는 1-based, index 0은 비움
+    rows.push(values.map(function (v) {
+      if (v === null || v === undefined) return "";
+      if (v instanceof Date) return v.toISOString();
+      if (typeof v === "object" && v.text !== undefined) return v.text; // richtext
+      if (typeof v === "object" && v.result !== undefined) return v.result; // formula
+      return String(v);
+    }));
+  });
+  if (rows.length === 0) return [];
+  var headers = rows[0];
+  return rows.slice(1).map(function (r) {
+    var obj = {};
+    headers.forEach(function (h, idx) { obj[h] = r[idx] !== undefined ? r[idx] : ""; });
+    return obj;
+  });
+}
+
+function isExcelFile(file) {
+  return /\.xlsx$/i.test(file.name);
+}
+
+// 파일 확장자에 따라 CSV 또는 XLSX를 읽어 동일한 형태(헤더 기반 객체 배열)로 반환한다.
+async function parseSpreadsheetFile(file) {
+  if (isExcelFile(file)) return parseXlsx(file);
+  return parseCsv(await readFileAsText(file));
+}
+
+function toFloat(v) {
   if (v === undefined || v === null || v === "") return 0;
   var n = parseFloat(v);
   return isNaN(n) ? 0 : n;

@@ -1,8 +1,6 @@
 // 연차 데이터 병합/그룹핑/기간 계산 등 업무 로직 (generate_vacation_notice.py와 1:1 대응)
 
-import { toFloat } from "./csv.js";
-
-export function loadEmployees(less1Granted, less1Used, tenuredGranted, tenuredUsed) {
+function loadEmployees(less1Granted, less1Used, tenuredGranted, tenuredUsed) {
   var usedById = {};
   less1Used.forEach(function (r) { usedById[r["아이디"]] = r; });
   tenuredUsed.forEach(function (r) { usedById[r["아이디"]] = r; });
@@ -29,7 +27,7 @@ export function loadEmployees(less1Granted, less1Used, tenuredGranted, tenuredUs
   return employees;
 }
 
-export function groupByDept(employees) {
+function groupByDept(employees) {
   var groups = {};
   employees.forEach(function (e) {
     if (!groups[e.dept]) groups[e.dept] = [];
@@ -62,7 +60,7 @@ function fmtDate(d) {
 }
 
 // 통보일 기준 가장 최근 입사기념일 ~ 그다음 기념일 전날
-export function periodStr(hireStr, noticeDate) {
+function periodStr(hireStr, noticeDate) {
   var hire = parseHireDate(hireStr);
   var annivThisYear = safeReplaceYear(hire, noticeDate.getFullYear());
   var start;
@@ -75,7 +73,7 @@ export function periodStr(hireStr, noticeDate) {
 }
 
 // 통보일 다음달부터 1년(12개월): 예) 2026년 7월 통보 -> 2026.08 ~ 2027.07
-export function usagePeriodMonths(noticeDate) {
+function usagePeriodMonths(noticeDate) {
   var y = noticeDate.getFullYear();
   var m = noticeDate.getMonth() + 1; // 1-12
   var result = [];
@@ -87,10 +85,40 @@ export function usagePeriodMonths(noticeDate) {
   return result;
 }
 
-export function safeSheetName(dept) {
+function isWeekday(d) {
+  var wd = d.getDay();
+  return wd !== 0 && wd !== 6;
+}
+
+// 통보일 다음날부터 1년간의 평일(주말 제외) 중 count개를 무작위로 뽑아 오름차순으로 반환
+function pickRandomBusinessDates(noticeDate, count) {
+  count = Math.max(0, Math.round(count));
+  var start = new Date(noticeDate.getFullYear(), noticeDate.getMonth(), noticeDate.getDate() + 1);
+  var end = new Date(noticeDate.getFullYear() + 1, noticeDate.getMonth(), noticeDate.getDate() - 1);
+  var pool = [];
+  for (var d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    if (isWeekday(d)) pool.push(new Date(d));
+  }
+  for (var i = pool.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+  }
+  var picked = pool.slice(0, Math.min(count, pool.length));
+  picked.sort(function (a, b) { return a - b; });
+  return picked;
+}
+
+// "10월 28일 / 10월 29일 / ..." 형식으로 잔여연차 개수만큼 지정일 목록 문자열 생성
+function usageDateListStr(noticeDate, remainCount) {
+  return pickRandomBusinessDates(noticeDate, remainCount)
+    .map(function (d) { return (d.getMonth() + 1) + "월 " + d.getDate() + "일"; })
+    .join(" / ");
+}
+
+function safeSheetName(dept) {
   return dept.replace(/[\\/*?:\[\]]/g, "_").slice(0, 31);
 }
 
-export function safeFileName(dept) {
+function safeFileName(dept) {
   return dept.replace(/[\\/*?:"<>|]/g, "_");
 }

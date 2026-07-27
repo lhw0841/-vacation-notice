@@ -114,6 +114,22 @@ input[type=date]{
 }
 .field-note{font-size:12.5px; color:var(--muted);}
 
+.version-block{margin-bottom:16px;}
+.version-label{display:block; font-size:13.5px; font-weight:600; color:var(--text); margin-bottom:8px;}
+.version-toggle{display:flex; gap:10px; flex-wrap:wrap;}
+.toggle-btn{
+  appearance:none; cursor:pointer; font:inherit; text-align:left;
+  display:flex; flex-direction:column; gap:3px;
+  padding:10px 16px; border-radius:9px; border:1.5px solid var(--border);
+  background:var(--surface); color:var(--text); transition:background .15s ease, border-color .15s ease, color .15s ease;
+}
+.toggle-btn:hover{border-color:var(--accent);}
+.toggle-btn .toggle-main{font-size:14px; font-weight:700;}
+.toggle-btn .toggle-sub{font-size:13px; font-weight:600; color:var(--muted);}
+.toggle-btn.active{background:var(--accent-soft); border-color:var(--accent); color:var(--text);}
+.toggle-btn.active .toggle-main{color:var(--accent);}
+.toggle-btn.active .toggle-sub{color:var(--accent); opacity:.85;}
+
 .btn{
   appearance:none; border:none; cursor:pointer; font:inherit; font-weight:700;
   border-radius:8px; padding:11px 20px; font-size:14.5px;
