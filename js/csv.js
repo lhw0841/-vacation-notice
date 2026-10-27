@@ -28,6 +28,7 @@ function parseCsv(text) {
   return rows.slice(1).map(function (r) {
     var obj = {};
     headers.forEach(function (h, idx) { obj[h] = r[idx] !== undefined ? r[idx] : ""; });
+    obj.__cells = r; // 연차 시간(F/G열)을 헤더명과 무관하게 열 위치로 읽을 수 있도록 원본 행 보관
     return obj;
   });
 }
@@ -72,6 +73,7 @@ async function parseXlsx(file) {
   return rows.slice(1).map(function (r) {
     var obj = {};
     headers.forEach(function (h, idx) { obj[h] = r[idx] !== undefined ? r[idx] : ""; });
+    obj.__cells = r; // 연차 시간(F/G열)을 헤더명과 무관하게 열 위치로 읽을 수 있도록 원본 행 보관
     return obj;
   });
 }

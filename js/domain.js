@@ -1,5 +1,17 @@
 // 연차 데이터 병합/그룹핑/기간 계산 등 업무 로직 (generate_vacation_notice.py와 1:1 대응)
 
+var HOURS_COL = 5; // F열: 연차 시간(4시간=반차, 8시간=1일)
+var EXAMPLE_HOURS_COL = 6; // G열: 일수(F)+시간(G)이 함께 나온 예시 파일 대응
+var HOURS_PER_DAY = 8;
+
+// F열 시간을 8로 나눠 일수로 환산한다. 헤더명이 바뀌어도 되도록 열 위치로 읽는다.
+function leaveDays(r) {
+  var cells = r.__cells || [];
+  var h = cells[EXAMPLE_HOURS_COL];
+  if (h === undefined || h === "") h = cells[HOURS_COL];
+  return toFloat(h) / HOURS_PER_DAY;
+}
+
 function loadEmployees(less1Granted, less1Used, tenuredGranted, tenuredUsed) {
   var usedById = {};
   less1Used.forEach(function (r) { usedById[r["아이디"]] = r; });
@@ -11,8 +23,8 @@ function loadEmployees(less1Granted, less1Used, tenuredGranted, tenuredUsed) {
     employees.push({
       id: r["아이디"], name: r["이름"], dept: r["소속"], title: r["직위"],
       hire: r["입사일자"],
-      granted: toFloat(r["1년 미만 연차"]),
-      used: toFloat(u["1년 미만 연차(사용일)"]),
+      granted: leaveDays(r),
+      used: leaveDays(u),
     });
   });
   tenuredGranted.forEach(function (r) {
@@ -20,8 +32,8 @@ function loadEmployees(less1Granted, less1Used, tenuredGranted, tenuredUsed) {
     employees.push({
       id: r["아이디"], name: r["이름"], dept: r["소속"], title: r["직위"],
       hire: r["입사일자"],
-      granted: toFloat(r["근속 연차"]),
-      used: toFloat(u["근속 연차(사용일)"]),
+      granted: leaveDays(r),
+      used: leaveDays(u),
     });
   });
   return employees;
@@ -60,7 +72,7 @@ function fmtDate(d) {
 }
 
 // 통보일 기준 가장 최근 입사기념일 ~ 그다음 기념일 전날
-function periodStr(hireStr, noticeDate) {
+function periodRange(hireStr, noticeDate) {
   var hire = parseHireDate(hireStr);
   var annivThisYear = safeReplaceYear(hire, noticeDate.getFullYear());
   var start;
@@ -69,7 +81,12 @@ function periodStr(hireStr, noticeDate) {
   else start = safeReplaceYear(hire, noticeDate.getFullYear() - 1);
   var end = safeReplaceYear(start, start.getFullYear() + 1);
   end.setDate(end.getDate() - 1);
-  return fmtDate(start) + "-" + fmtDate(end);
+  return { start: start, end: end };
+}
+
+function periodStr(hireStr, noticeDate) {
+  var p = periodRange(hireStr, noticeDate);
+  return fmtDate(p.start) + "-" + fmtDate(p.end);
 }
 
 // 통보일 다음달부터 1년(12개월): 예) 2026년 7월 통보 -> 2026.08 ~ 2027.07
@@ -163,11 +180,13 @@ function isBusinessDay(d) {
   return isWeekday(d) && !isHoliday(d);
 }
 
-// 통보일 다음날부터 1년간의 영업일(주말+공휴일 제외) 중 count개를 무작위로 뽑아 오름차순으로 반환
-function pickRandomBusinessDates(noticeDate, count) {
+// 통보일 다음날부터 대상기간 만료일(periodEnd)까지의 영업일(주말+공휴일 제외) 중 count개를 무작위로 뽑아 오름차순으로 반환.
+// periodEnd가 없으면 통보일 다음날부터 1년을 범위로 쓴다.
+function pickRandomBusinessDates(noticeDate, count, periodEnd) {
   count = Math.max(0, Math.round(count));
   var start = new Date(noticeDate.getFullYear(), noticeDate.getMonth(), noticeDate.getDate() + 1);
   var end = new Date(noticeDate.getFullYear() + 1, noticeDate.getMonth(), noticeDate.getDate() - 1);
+  if (periodEnd && periodEnd < end) end = periodEnd;
   var pool = [];
   for (var d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
     if (isBusinessDay(d)) pool.push(new Date(d));
@@ -183,9 +202,12 @@ function pickRandomBusinessDates(noticeDate, count) {
 
 // "10월 28일 / 10월 29일 / 2026년 1월 5일 / ..." 형식으로 잔여연차 개수만큼 지정일 목록 문자열 생성.
 // 연도가 바뀌는 지점에서만 "YYYY년"을 붙여 표시한다(대상기간이 해를 넘길 수 있어 혼동 방지).
-function usageDateListStr(noticeDate, remainCount) {
+// 대상기간 만료 전 영업일이 잔여연차보다 적으면 배정 못 한 일수를 끝에 표시한다.
+function usageDateListStr(noticeDate, remainCount, periodEnd) {
   var lastYear = null;
-  return pickRandomBusinessDates(noticeDate, remainCount)
+  var picked = pickRandomBusinessDates(noticeDate, remainCount, periodEnd);
+  var shortage = Math.max(0, Math.round(remainCount)) - picked.length;
+  var str = picked
     .map(function (d) {
       var y = d.getFullYear();
       var label = (d.getMonth() + 1) + "월 " + d.getDate() + "일";
@@ -196,6 +218,8 @@ function usageDateListStr(noticeDate, remainCount) {
       return label;
     })
     .join(" / ");
+  if (shortage > 0) str += (str ? " " : "") + "(대상기간 내 영업일 부족: " + shortage + "일 미배정)";
+  return str;
 }
 
 function safeSheetName(dept) {

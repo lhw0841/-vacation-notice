@@ -134,7 +134,7 @@ async function buildWorkbook(dept, members, noticeDate) {
       font: { name: FONT_NAME, size: 11 },
       align: { horizontal: "left", vertical: "middle", wrapText: true },
     });
-    ws.getCell(row, 2).value = usageDateListStr(noticeDate, count);
+    ws.getCell(row, 2).value = usageDateListStr(noticeDate, count, periodRange(emp.hire, noticeDate).end);
     ws.getRow(row).height = Math.max(25, lines * 18);
     row++;
   });
